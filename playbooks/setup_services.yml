@@ -1,0 +1,91 @@
+---
+- name: Установка и запуск Docker на машинах группы app
+  hosts: app
+  become: yes
+  become_user: root
+  tasks:
+    - name: Установка необходимых пакетов для Docker (Ubuntu)
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+        state: present
+      when: ansible_distribution == "Ubuntu"
+
+    - name: Добавление Docker GPG ключа (Ubuntu)
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+      when: ansible_distribution == "Ubuntu"
+
+    - name: Добавление Docker репозитория (Ubuntu)
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable"
+        state: present
+      when: ansible_distribution == "Ubuntu"
+
+    - name: Установка Docker (Ubuntu)
+      apt:
+        name: docker-ce
+        state: present
+        update_cache: yes
+      when: ansible_distribution == "Ubuntu"
+
+    - name: Установка необходимых пакетов для Docker (CentOS)
+      yum:
+        name:
+          - yum-utils
+          - device-mapper-persistent-data
+          - lvm2
+        state: present
+      when: ansible_distribution == "CentOS"
+      
+    - name: Добавление Docker репозитория (CentOS)
+      yum_repository:
+        name: docker-ce
+        description: Docker CE Stable - $basearch
+        baseurl: https://download.docker.com/linux/centos/8/$basearch/stable
+        gpgcheck: yes
+        gpgkey: https://download.docker.com/linux/centos/gpg
+        enabled: yes
+      when: ansible_distribution == "CentOS"
+
+    - name: Установка Docker (CentOS)
+      yum:
+        name: docker-ce
+        state: present
+      when: ansible_distribution == "CentOS"
+
+    - name: Запуск и включение Docker
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+- name: Установка и запуск PostgreSQL на машине группы database
+  hosts: database
+  become: yes
+  become_user: root
+  vars_files:
+    - /etc/ansible/vars/database.yml
+  tasks:
+    - name: Установка PostgreSQL
+      apt:
+        name: "postgresql"
+        state: present
+        update_cache: yes
+      when: ansible_distribution == "Ubuntu"
+
+    - name: Инициализация базы данных
+      command: sudo -u postgres /usr/lib/postgresql/{{ postgres_version }}/bin/initdb -D {{ data_directory }}
+      args:
+        creates: "{{ data_directory }}/PG_VERSION"
+      when: ansible_distribution == "Ubuntu"
+
+    - name: Запуск и включение PostgreSQL
+      service:
+        name: postgresql
+        state: started
+        enabled: yes
